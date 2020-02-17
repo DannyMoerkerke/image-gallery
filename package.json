@@ -1,0 +1,15 @@
+{
+  "name": "image-gallery",
+  "version": "1.0.0",
+  "description": "An image gallery Web Component",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "ws -p 8080"
+  },
+  "author": "Danny Moerkerke <danny@dannymoerkerke.nl>",
+  "license": "ISC",
+  "devDependencies": {
+    "local-web-server": "^4.0.0"
+  }
+}
