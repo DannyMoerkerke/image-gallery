@@ -1,7 +1,7 @@
 export class ImageGallery extends HTMLElement {
 
   static get observedAttributes() {
-    return [];
+    return ['thumbs'];
   }
 
   constructor() {
@@ -12,9 +12,14 @@ export class ImageGallery extends HTMLElement {
     shadowRoot.innerHTML = `
       <style>
         :host {
+          --controls-background: #ffffff;
+          --controls-color: #000000;
+          --dot-color: #ffffff;
+          --dot-active-color: #ff0000;
           display: block;
           position: relative;
         }
+        
         #container {
           overflow-x: hidden;
           margin-bottom: 2px;
@@ -43,8 +48,8 @@ export class ImageGallery extends HTMLElement {
           height: 32px;
           border-radius: 50%;
           font-size: 1em;
-          background-color: #ffffff;
-          color: #000000;
+          background-color: var(--controls-background);
+          color: var(--controls-color);
           cursor: pointer;
           margin: 0 5px;
           font-weight: bold;
@@ -83,13 +88,13 @@ export class ImageGallery extends HTMLElement {
           height: 8px;
           border-radius: 50%;
           margin-right: 16px;
-          background-color: #ffffff;
+          background-color: var(--dot-color);
           cursor: pointer;
         }
         
         .dot.active,
         .dot:hover {
-          background-color: #ff0000;
+          background-color: var(--dot-active-color);
         }
         
         #thumbs-container {
@@ -97,6 +102,7 @@ export class ImageGallery extends HTMLElement {
           overflow-x: hidden;
           display: none;
         }
+        
         #thumbs-slider {
           justify-content: space-between;
           transition: margin-left .8s cubic-bezier(0, 0.92, 0.32, 0.98);
@@ -118,6 +124,7 @@ export class ImageGallery extends HTMLElement {
         :host([thumbs]) #thumbs-container {
           display: block;
         }
+        
         slot[name="image"] {
           display: none;
         }
@@ -151,24 +158,24 @@ export class ImageGallery extends HTMLElement {
       </div>    
       
     `;
-    const imageSlot = this.shadowRoot.querySelector('slot[name="image"]');
 
-    let ready = false;
+    this.thumbsContainer = this.shadowRoot.querySelector('#thumbs-container');
+    this.thumbsSlider = this.shadowRoot.querySelector('#thumbs-slider');
+
+    const imageSlot = this.shadowRoot.querySelector('slot[name="image"]');
 
     imageSlot.addEventListener('slotchange', () => {
       const images = imageSlot.assignedNodes();
 
-      console.log(images);
-
       const promises = images.filter(image => !image.complete)
-                             .map(image => {
-                               return new Promise((resolve, reject) => {
-                                 image.addEventListener('load', resolve);
-                                 image.addEventListener('error', reject);
-                               });
-                             });
+      .map(image => {
+        return new Promise((resolve, reject) => {
+          image.addEventListener('load', resolve);
+          image.addEventListener('error', reject);
+        });
+      });
 
-      const init = e => {
+      const init = () => {
         this.init(images);
         this.showImage(this.curIndex);
 
@@ -190,16 +197,21 @@ export class ImageGallery extends HTMLElement {
 
     prevButton.addEventListener('click', this.previous.bind(this));
     nextButton.addEventListener('click', this.next.bind(this));
+  }
 
+  attributeChangedCallback(attr, oldValue, newValue) {
+    if(attr === 'thumbs') {
+      this.thumbsContainer.style.display = this.hasAttribute('thumbs') ? 'block' : 'none';
+    }
   }
 
   init(images) {
-    this.configureImageContainer(images);
-    this.configureControls(images);
-    this.configureThumbs(images);
+    this.setupImageContainer(images);
+    this.setupControls(images);
+    this.setupThumbs(images);
   }
 
-  configureImageContainer(images) {
+  setupImageContainer(images) {
     this.imageContainer = this.shadowRoot.querySelector('#image-container');
 
     const {width, height} = images[0];
@@ -210,23 +222,14 @@ export class ImageGallery extends HTMLElement {
     this.style.width = `${width}px`;
     this.style.height = `${height}px`;
 
-    this.imageOffsets = [0];
-
-    const totalWidth = images.reduce((acc, image) => {
-      const width = acc + image.width;
-      console.log(image.width);
-      this.imageOffsets.push(width);
-      return width;
-    }, 0);
+    const {totalWidth, offsets} = this.getTotalWidthAndOffsets(images);
+    this.imageOffsets = offsets;
 
     this.imageContainer.style.width = `${totalWidth}px`;
     this.imageContainer.style.height = `${height}px`;
   }
 
-  configureThumbs(images) {
-    this.thumbsContainer = this.shadowRoot.querySelector('#thumbs-container');
-    this.thumbsSlider = this.shadowRoot.querySelector('#thumbs-slider');
-
+  setupThumbs(images) {
     this.thumbsContainerWidth = this.thumbsContainer.offsetWidth;
 
     this.thumbsSlider.innerHTML = '';
@@ -241,26 +244,20 @@ export class ImageGallery extends HTMLElement {
 
     this.thumbs = [...this.thumbsSlider.querySelectorAll('img')];
 
-    this.thumbOffsets = [0];
-
-    const totalWidth = this.thumbs.reduce((acc, thumb) => {
-      const width = acc + thumb.offsetWidth;
-
-      this.thumbOffsets.push(width);
-      return width;
-    }, 0);
+    const {totalWidth, offsets} = this.getTotalWidthAndOffsets(this.thumbs);
+    this.thumbOffsets = offsets;
 
     this.thumbsSlider.style.width = `${totalWidth}px`;
     this.thumbsSliderWidth = totalWidth;
 
     this.thumbsSlider.addEventListener('click', ({target}) => {
-      if(target.classList.contains('thumb')) {
+      if(this.isThumb(target)) {
         this.showImage(parseInt(target.dataset.index));
       }
     });
   }
 
-  configureControls(images) {
+  setupControls(images) {
     const controlsContainer = this.shadowRoot.querySelector('#controls-container');
 
     controlsContainer.innerHTML = images.reduce((acc, _, index) => {
@@ -271,7 +268,7 @@ export class ImageGallery extends HTMLElement {
     this.dots[this.curIndex].classList.add('active');
 
     controlsContainer.addEventListener('click', ({target}) => {
-      if(target.classList.contains('dot')) {
+      if(this.isDot(target)) {
         this.showImage(parseInt(target.dataset.index));
       }
     });
@@ -287,24 +284,26 @@ export class ImageGallery extends HTMLElement {
 
   showImage(index) {
     this.curIndex = index < 0 ? 0 :
-                    index >= this.numImages - 1 ? this.numImages - 1 : index;
+      index >= this.numImages - 1 ? this.numImages - 1 : index;
 
     this.imageContainer.style.marginLeft = `-${this.imageOffsets[this.curIndex]}px`;
 
-    let m = this.thumbOffsets[this.curIndex] > this.thumbsContainerWidth / 2 ?
-      0 - this.thumbOffsets[this.curIndex] + this.thumbsContainerWidth / 2 : 0;
+    const thumbOffset = this.thumbOffsets[this.curIndex];
+    const halfThumbsContainerWidth = this.thumbsContainerWidth / 2;
 
-    if(Math.abs(m) + this.thumbsContainerWidth > this.thumbsSliderWidth) {
-      m = (this.thumbsSliderWidth - this.thumbsContainerWidth) * -1
+    let sliderOffset = thumbOffset > halfThumbsContainerWidth ? -(thumbOffset + halfThumbsContainerWidth) : 0;
+
+    if(Math.abs(sliderOffset) + this.thumbsContainerWidth > this.thumbsSliderWidth) {
+      sliderOffset = -(this.thumbsSliderWidth - this.thumbsContainerWidth);
     }
 
-    this.thumbsSlider.style.marginLeft = `${m}px`;
+    this.thumbsSlider.style.marginLeft = `${sliderOffset}px`;
 
-    this.updateSelectors(this.curIndex);
+    this.updateDots(this.curIndex);
     this.updateThumbs(this.curIndex);
   }
 
-  updateSelectors(index) {
+  updateDots(index) {
     this.dots.forEach(dot => dot.classList.remove('active'));
     this.dots[index].classList.add('active');
   }
@@ -314,12 +313,25 @@ export class ImageGallery extends HTMLElement {
     this.thumbs[index].classList.add('active');
   }
 
-  attributeChangedCallback(attr, oldVal, newVal) {
-
+  isThumb(element) {
+    return element.classList.contains('thumb');
   }
 
-  disconnectedCallback() {
+  isDot(element) {
+    return element.classList.contains('dot');
+  }
 
+  getTotalWidthAndOffsets(elements) {
+    const offsets = [0];
+
+    const totalWidth = elements.reduce((acc, element) => {
+      const width = acc + Math.max(element.width, element.offsetWidth);
+
+      offsets.push(width);
+      return width;
+    }, 0);
+
+    return {totalWidth, offsets};
   }
 }
 
