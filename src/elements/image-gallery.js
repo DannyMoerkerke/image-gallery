@@ -17,12 +17,12 @@ export class ImageGallery extends HTMLElement {
           --dot-color: #ffffff;
           --dot-active-color: #ff0000;
           display: block;
-          position: relative;
         }
         
         #container {
           overflow-x: hidden;
           margin-bottom: 2px;
+          position: relative;
         }
         
         #image-container {
@@ -156,39 +156,12 @@ export class ImageGallery extends HTMLElement {
       <div id="thumbs-container">
         <div id="thumbs-slider"></div>
       </div>    
-      
     `;
 
     this.thumbsContainer = this.shadowRoot.querySelector('#thumbs-container');
     this.thumbsSlider = this.shadowRoot.querySelector('#thumbs-slider');
-
-    const imageSlot = this.shadowRoot.querySelector('slot[name="image"]');
-
-    imageSlot.addEventListener('slotchange', () => {
-      const images = imageSlot.assignedNodes();
-
-      const promises = images.filter(image => !image.complete)
-      .map(image => {
-        return new Promise((resolve, reject) => {
-          image.addEventListener('load', resolve);
-          image.addEventListener('error', reject);
-        });
-      });
-
-      const init = () => {
-        this.init(images);
-        this.showImage(this.curIndex);
-
-        imageSlot.style.display = 'block';
-      };
-
-      Promise.all(promises)
-      .then(init)
-      .catch((err) => {
-        console.log(err);
-      });
-    });
-
+    this.imageContainer = this.shadowRoot.querySelector('#image-container');
+    this.controlsContainer = this.shadowRoot.querySelector('#controls-container');
   }
 
   connectedCallback() {
@@ -197,6 +170,32 @@ export class ImageGallery extends HTMLElement {
 
     prevButton.addEventListener('click', this.previous.bind(this));
     nextButton.addEventListener('click', this.next.bind(this));
+
+    const imageSlot = this.shadowRoot.querySelector('slot[name="image"]');
+
+    imageSlot.addEventListener('slotchange', () => {
+      this.images = imageSlot.assignedNodes();
+
+      const promises = this.images.filter(image => !image.complete)
+      .map(image => {
+        return new Promise((resolve, reject) => {
+          image.addEventListener('load', resolve);
+          image.addEventListener('error', reject);
+        });
+      });
+
+      // wait until all images are loaded
+      Promise.all(promises)
+      .then(() => {
+        this.init(this.images);
+        this.showImage(this.curIndex);
+
+        imageSlot.style.display = 'block';
+      })
+      .catch(err => {
+        console.log(err);
+      });
+    });
   }
 
   attributeChangedCallback(attr, oldValue, newValue) {
@@ -207,20 +206,22 @@ export class ImageGallery extends HTMLElement {
 
   init(images) {
     this.setupImageContainer(images);
-    this.setupControls(images);
     this.setupThumbs(images);
+    this.setupControls(images);
+
+    this.dispatchEvent(new CustomEvent('ready', {
+      bubbles: true,
+      composed: true
+    }));
   }
 
   setupImageContainer(images) {
-    this.imageContainer = this.shadowRoot.querySelector('#image-container');
-
     const {width, height} = images[0];
 
     this.curIndex = 0;
     this.numImages = images.length;
 
     this.style.width = `${width}px`;
-    this.style.height = `${height}px`;
 
     const {totalWidth, offsets} = this.getTotalWidthAndOffsets(images);
     this.imageOffsets = offsets;
@@ -258,49 +259,18 @@ export class ImageGallery extends HTMLElement {
   }
 
   setupControls(images) {
-    const controlsContainer = this.shadowRoot.querySelector('#controls-container');
-
-    controlsContainer.innerHTML = images.reduce((acc, _, index) => {
+    this.controlsContainer.innerHTML = images.reduce((acc, _, index) => {
       return `${acc}<div class="dot" data-index="${index}"></div>`;
     }, ``);
 
     this.dots = [...this.shadowRoot.querySelectorAll('.dot')];
     this.dots[this.curIndex].classList.add('active');
 
-    controlsContainer.addEventListener('click', ({target}) => {
+    this.controlsContainer.addEventListener('click', ({target}) => {
       if(this.isDot(target)) {
         this.showImage(parseInt(target.dataset.index));
       }
     });
-  }
-
-  previous() {
-    this.showImage(this.curIndex - 1);
-  }
-
-  next() {
-    this.showImage(this.curIndex + 1);
-  }
-
-  showImage(index) {
-    this.curIndex = index < 0 ? 0 :
-      index >= this.numImages - 1 ? this.numImages - 1 : index;
-
-    this.imageContainer.style.marginLeft = `-${this.imageOffsets[this.curIndex]}px`;
-
-    const thumbOffset = this.thumbOffsets[this.curIndex];
-    const halfThumbsContainerWidth = this.thumbsContainerWidth / 2;
-
-    let sliderOffset = thumbOffset > halfThumbsContainerWidth ? -(thumbOffset + halfThumbsContainerWidth) : 0;
-
-    if(Math.abs(sliderOffset) + this.thumbsContainerWidth > this.thumbsSliderWidth) {
-      sliderOffset = -(this.thumbsSliderWidth - this.thumbsContainerWidth);
-    }
-
-    this.thumbsSlider.style.marginLeft = `${sliderOffset}px`;
-
-    this.updateDots(this.curIndex);
-    this.updateThumbs(this.curIndex);
   }
 
   updateDots(index) {
@@ -332,6 +302,45 @@ export class ImageGallery extends HTMLElement {
     }, 0);
 
     return {totalWidth, offsets};
+  }
+
+  previous() {
+    this.showImage(this.curIndex - 1);
+  }
+
+  next() {
+    this.showImage(this.curIndex + 1);
+  }
+
+  showImage(index) {
+    const prevIndex = this.curIndex;
+    this.curIndex = Math.min(Math.max(index, 0), this.numImages - 1);
+
+    if(prevIndex !== this.curIndex) {
+      this.imageContainer.style.marginLeft = `-${this.imageOffsets[this.curIndex]}px`;
+
+      const thumbOffset = this.thumbOffsets[this.curIndex];
+      const halfThumbsContainerWidth = this.thumbsContainerWidth / 2;
+
+      let sliderOffset = thumbOffset > halfThumbsContainerWidth ? -(thumbOffset + halfThumbsContainerWidth) : 0;
+
+      if(Math.abs(sliderOffset) + this.thumbsContainerWidth > this.thumbsSliderWidth) {
+        sliderOffset = -(this.thumbsSliderWidth - this.thumbsContainerWidth);
+      }
+
+      this.thumbsSlider.style.marginLeft = `${sliderOffset}px`;
+
+      this.updateDots(this.curIndex);
+      this.updateThumbs(this.curIndex);
+
+      this.imageContainer.dispatchEvent(new CustomEvent('image-change', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          image: this.images[this.curIndex],
+        }
+      }));
+    }
   }
 }
 

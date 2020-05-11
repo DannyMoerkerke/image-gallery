@@ -3,8 +3,19 @@
   <head>
     <meta charset="UTF-8">
     <title>Image Gallery</title>
+
+    <style>
+      #buttons {
+        padding-top: 10px;
+      }
+      #prev,
+      #next {
+        cursor: pointer;
+      }
+    </style>
   </head>
   <body>
+
     <image-gallery thumbs>
       <img src="src/img/IMG_0791.png" slot="image">
       <img src="src/img/IMG_0829.png" slot="image">
@@ -15,7 +26,32 @@
       <img src="src/img/IMG_0955.png" slot="image">
     </image-gallery>
 
+    <div id="buttons">
+      <button type="button" id="prev">Previous</button>
+      <button type="button" id="next">Next</button>
+    </div>
+
     <script type="module" src="src/elements/image-gallery.js"></script>
+
+    <script>
+      const gallery = document.querySelector('image-gallery');
+      const prev = document.querySelector('#prev');
+      const next = document.querySelector('#next');
+
+      prev.addEventListener('click', () => {
+        gallery.previous();
+      });
+
+      next.addEventListener('click', () => {
+        gallery.next();
+      });
+
+      gallery.addEventListener('image-change', e => {
+        console.log('now showing image', e.detail.image);
+        console.log('target', e.target);
+        console.log('composedPath', e.composedPath());
+      })
+    </script>
 
   </body>
 </html>
