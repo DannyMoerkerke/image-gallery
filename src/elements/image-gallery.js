@@ -249,6 +249,7 @@ export class ImageGallery extends HTMLElement {
 
     this.thumbsSlider.style.width = `${totalWidth}px`;
     this.thumbsSliderWidth = totalWidth;
+    this.thumbs[this.curIndex].classList.add('active');
 
     this.thumbsSlider.addEventListener('click', ({target}) => {
       if(this.isThumb(target)) {
@@ -272,14 +273,9 @@ export class ImageGallery extends HTMLElement {
     });
   }
 
-  updateDots(index) {
-    this.dots.forEach(dot => dot.classList.remove('active'));
-    this.dots[index].classList.add('active');
-  }
-
-  updateThumbs(index) {
-    this.thumbs.forEach(thumb => thumb.classList.remove('active'));
-    this.thumbs[index].classList.add('active');
+  setActive(elements, index) {
+    elements.forEach(element => element.classList.remove('active'));
+    elements[index].classList.add('active');
   }
 
   isThumb(element) {
@@ -329,8 +325,8 @@ export class ImageGallery extends HTMLElement {
 
       this.thumbsSlider.style.marginLeft = `${sliderOffset}px`;
 
-      this.updateDots(this.curIndex);
-      this.updateThumbs(this.curIndex);
+      this.setActive(this.dots, this.curIndex);
+      this.setActive(this.thumbs, this.curIndex);
 
       this.imageSlider.dispatchEvent(new CustomEvent('image-change', {
         bubbles: true,
