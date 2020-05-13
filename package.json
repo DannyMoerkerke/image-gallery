@@ -4,12 +4,15 @@
   "description": "An image gallery Web Component",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "ws -p 8080 --spa test/index.html",
     "start": "ws -p 8080"
   },
   "author": "Danny Moerkerke <danny@dannymoerkerke.nl>",
   "license": "ISC",
   "devDependencies": {
-    "local-web-server": "^4.0.0"
+    "chai": "^4.2.0",
+    "local-web-server": "^4.0.0",
+    "mocha": "^7.1.2",
+    "sinon": "^9.0.2"
   }
 }

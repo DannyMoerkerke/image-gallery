@@ -19,13 +19,13 @@ export class ImageGallery extends HTMLElement {
           display: block;
         }
         
-        #container {
+        #image-container {
           overflow-x: hidden;
           margin-bottom: 2px;
           position: relative;
         }
         
-        #image-container {
+        #image-slider {
           transition: margin-left .8s cubic-bezier(0, 0.92, 0.32, 0.98);
         }
         
@@ -36,6 +36,10 @@ export class ImageGallery extends HTMLElement {
           align-items: center;
           height: 100%;
           top: 0;
+        }
+        
+        #prev-container {
+          left: 0;
         }
         
         #next-container {
@@ -76,9 +80,9 @@ export class ImageGallery extends HTMLElement {
           transition: opacity .3s ease-out;
         }
         
-        #container:hover #prev-container,
-        #container:hover #next-container,
-        #container:hover #controls-container {
+        #image-container:hover #prev-container,
+        #image-container:hover #next-container,
+        #image-container:hover #controls-container {
           opacity: 1;
         }
         
@@ -128,13 +132,9 @@ export class ImageGallery extends HTMLElement {
         slot[name="image"] {
           display: none;
         }
-        
-        ::slotted(img) {
-          display: inline-block;
-        }
       </style>
       
-      <div id="container">
+      <div id="image-container">
         <div id="prev-container">
           <button id="prev">&lt;</button>
         </div>
@@ -148,7 +148,7 @@ export class ImageGallery extends HTMLElement {
           </div>
         </div>
         
-        <div id="image-container">
+        <div id="image-slider">
           <slot name="image"></slot>
         </div>
       </div>  
@@ -160,7 +160,7 @@ export class ImageGallery extends HTMLElement {
 
     this.thumbsContainer = this.shadowRoot.querySelector('#thumbs-container');
     this.thumbsSlider = this.shadowRoot.querySelector('#thumbs-slider');
-    this.imageContainer = this.shadowRoot.querySelector('#image-container');
+    this.imageSlider = this.shadowRoot.querySelector('#image-slider');
     this.controlsContainer = this.shadowRoot.querySelector('#controls-container');
   }
 
@@ -205,7 +205,7 @@ export class ImageGallery extends HTMLElement {
   }
 
   init(images) {
-    this.setupImageContainer(images);
+    this.setupImages(images);
     this.setupThumbs(images);
     this.setupControls(images);
 
@@ -215,19 +215,18 @@ export class ImageGallery extends HTMLElement {
     }));
   }
 
-  setupImageContainer(images) {
-    const {width, height} = images[0];
-
+  setupImages(images) {
     this.curIndex = 0;
     this.numImages = images.length;
 
+    const {width, height} = images[0];
     this.style.width = `${width}px`;
 
     const {totalWidth, offsets} = this.getTotalWidthAndOffsets(images);
     this.imageOffsets = offsets;
 
-    this.imageContainer.style.width = `${totalWidth}px`;
-    this.imageContainer.style.height = `${height}px`;
+    this.imageSlider.style.width = `${totalWidth}px`;
+    this.imageSlider.style.height = `${height}px`;
   }
 
   setupThumbs(images) {
@@ -317,7 +316,7 @@ export class ImageGallery extends HTMLElement {
     this.curIndex = Math.min(Math.max(index, 0), this.numImages - 1);
 
     if(prevIndex !== this.curIndex) {
-      this.imageContainer.style.marginLeft = `-${this.imageOffsets[this.curIndex]}px`;
+      this.imageSlider.style.marginLeft = `-${this.imageOffsets[this.curIndex]}px`;
 
       const thumbOffset = this.thumbOffsets[this.curIndex];
       const halfThumbsContainerWidth = this.thumbsContainerWidth / 2;
@@ -333,7 +332,7 @@ export class ImageGallery extends HTMLElement {
       this.updateDots(this.curIndex);
       this.updateThumbs(this.curIndex);
 
-      this.imageContainer.dispatchEvent(new CustomEvent('image-change', {
+      this.imageSlider.dispatchEvent(new CustomEvent('image-change', {
         bubbles: true,
         composed: true,
         detail: {
